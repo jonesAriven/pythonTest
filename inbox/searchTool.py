@@ -337,7 +337,6 @@ class search():
         return result_list
 
     def find_files_content_thread(self, process_list, kword, len_process_list):
-        tmp_list = []
         for file in process_list:
             self.set_count()
             i = self.get_count()
@@ -360,21 +359,18 @@ class search():
     # 　多线程查询文件内容
     def find_files_content_quick(self, process_list, kword):
         len_process_list = len(process_list)
-        self.set_process_list(process_list)
-        len_process_list_1 = len_process_list // 4
-        len_process_list_2 = len_process_list // 4
-        len_process_list_3 = len_process_list // 4
-        len_process_list_4 = len_process_list // 4 + len_process_list % 4
+        tmp_list_size = len_process_list // 4
+
         t1 = threading.Thread(target=self.find_files_content_thread,
-                              args=(process_list[0: len_process_list_1], kword, len_process_list,))
+                              args=(process_list[0: tmp_list_size], kword, len_process_list,))
         t2 = threading.Thread(target=self.find_files_content_thread,
-                              args=(process_list[len_process_list_1: 2 * len_process_list_1], kword, len_process_list,))
+                              args=(process_list[tmp_list_size: 2 * tmp_list_size], kword, len_process_list,))
         t3 = threading.Thread(target=self.find_files_content_thread,
                               args=(
-                                  process_list[2 * len_process_list_1: 3 * len_process_list_1], kword,
+                                  process_list[2 * tmp_list_size: 3 * tmp_list_size], kword,
                                   len_process_list,))
         t4 = threading.Thread(target=self.find_files_content_thread,
-                              args=(process_list[3 * len_process_list_1:], kword, len_process_list,))
+                              args=(process_list[3 * tmp_list_size:], kword, len_process_list,))
         t1.start()
         t2.start()
         t3.start()
