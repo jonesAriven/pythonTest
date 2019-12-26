@@ -145,6 +145,9 @@ class search():
     def search_doc(self, filename, word):
         tmp_list = []
         docx_filename = ""
+        doc = None
+        pythoncom.CoInitialize()
+        wordApplication = wc.DispatchEx('Word.Application')
         try:
             # 将doc文件转为docx文件处理
             docx_filename = filename.replace("doc", "docx")
@@ -153,17 +156,14 @@ class search():
             # 还是把转为docx的文件缓存到另外一个路径，这样仅仅是第一次查询慢，后面的由于不必再次转换，将会非常快
             docx_filename = self.searchCache.get_cachePath() + "/" + ((os.path.split(docx_filename)[0]).replace("\\",
                                                                                                                 "_")).replace(
-                ":", "_") + \
-                            os.path.split(docx_filename)[1]  # 拼接缓存路径
+                "/", "_").replace(
+                ":", "_") + "_" + os.path.split(docx_filename)[1]  # 拼接缓存路径
             # print(docx_filename)
             # print("self.searchCache.get_cachePath()",self.searchCache.get_cachePath())
             # print("docx_filename1=",docx_filename)
             # 若是多线程，此处必须加上这行代码，否则会报 pywintypes.com_error: (-2147221008, '尚未调用 CoInitialize。', None, None)的错误
-            pythoncom.CoInitialize()
-            word_tmp = wc.DispatchEx('Word.Application')
-            doc = word_tmp.Documents.Open(filename)  # 生成的docx文件放到缓存路径下
+            doc = wordApplication.Documents.Open(filename)  # 生成的docx文件放到缓存路径下
             doc.SaveAs(docx_filename, 12, False, "", True, "", False, False, False, False)  # 转化后路径下的文件
-            doc.Close()
             tmp_list = self.search_docx(docx_filename, word)
             #             # 打开文档
             #             #  Document(filename)只支持打开后缀为docx的文档
@@ -177,13 +177,20 @@ class search():
             #             # 搜素完了将转换的文件删除
             #             if os.path.exists(docx_filename):
             #                 os.remove(docx_filename)
-            word_tmp.Quit()
+            # wordApplication.Quit()
         except:
             pass
-            # traceback.print_exc()
+            traceback.print_exc()
         finally:
             # 将缓存信息写入缓存文件
-            pythoncom.CoUninitialize()
+            pythoncom.CoInitialize()
+            if doc:
+                try:
+                    doc.Close()
+                    if wordApplication:
+                        wordApplication.Quit()
+                except:
+                    traceback.print_exc()
             self.update_cache_map(filename, docx_filename)
         return tmp_list
 
@@ -513,7 +520,7 @@ class search():
 if __name__ == '__main__':
     # 文件根目录
     # root_dir=sys.argv[1]
-    root_dir = "E:/jonesWorkSpace"
+    root_dir = "E:/java/ideaWorkspace/pythonTest/tmp"
     # root_dir = "D:/java/eclipse-workspace/python/tmp"
     # 要搜索的关键字
     #     word = sys.argv[2]
