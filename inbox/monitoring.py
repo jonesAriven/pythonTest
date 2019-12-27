@@ -4,7 +4,7 @@ import sys
 import win32file
 import win32con
 from pyCache import SearchCache
-import pymysql
+import pymysql  # pip install pymysql
 import datetime
 import cusMysqlUtils
 import traceback
