@@ -117,7 +117,9 @@ class search():
         current_st_mtime = os.stat(filename).st_mtime
         # 获取最近一次查询的文件的时间错
         # print(self.searchCache.get_cachemap())
-        pyCache = self.searchCache.get_pyCache(filename)
+        # pyCache = self.searchCache.get_pyCache(filename)
+        # 将缓存map由从文件里获取改为实时从数据库里读取
+        pyCache = self.searchCache.get_pyCache_FromDb(filename)
         # print(pyCache)
         recently_st_mtime = ""
         recently_cach_file_path = ""
@@ -128,18 +130,25 @@ class search():
         # print("current_st_mtime=", current_st_mtime)
         # print("recently_st_mtime", recently_st_mtime)
         # print("recently_cach_file_path=", recently_cach_file_path)
-        if str(current_st_mtime) == str(recently_st_mtime):  # 此处注意，要将分割出来的时间戳改为字符串，不然等号不成立
+        if str(current_st_mtime) == str(
+                recently_st_mtime) and recently_cach_file_path != "":  # 此处注意，要将分割出来的时间戳改为字符串，不然等号不成立
             # print("----------------------")
             tmp_list = self.search_docx(recently_cach_file_path, word)
         else:
-            tmp_list = self.search_doc(filename, word)
+            tmp_list = self.search_doc_1(filename, word)
         return tmp_list
 
     # 向缓存文件里写入信息
     def update_cache_map(self, filename, docx_filename):
-        # print(filename)
-        self.searchCache.get_cachemap().update({filename: str(os.stat(filename).st_mtime) + "@" + docx_filename})
-        # print("SearchCache.get_cachemap()=", self.searchCache.get_cachemap())
+        # self.searchCache.get_cachemap().update({filename: str(os.stat(filename).st_mtime) + "@" + docx_filename})
+        # 之前的map是写到文件，所以全量更新，现在写到数据库，只需增量更新
+        self.searchCache.update_docCache_Db(filename, str(os.stat(filename).st_mtime), docx_filename);
+
+    def search_doc_1(self, filename, word):
+        cache_docx_full_name = self.searchCache.change_doc_to_docx(filename)
+        tmp_list = self.search_docx(cache_docx_full_name, word)
+        self.update_cache_map(filename, cache_docx_full_name)
+        return tmp_list
 
     # 搜素doc文档 该方法相当慢，是把doc文档转为docx温文档后再查询
     def search_doc(self, filename, word):
@@ -182,8 +191,6 @@ class search():
             pass
             traceback.print_exc()
         finally:
-            # 将缓存信息写入缓存文件
-            pythoncom.CoInitialize()
             if doc:
                 try:
                     doc.Close()
@@ -423,16 +430,18 @@ class search():
         start_time = datetime.datetime.now()
         pprint.pprint("开始搜素，请耐心等待..............")
         # 查找传入目录下的所有文件
-        process_list = self.get_process_files(root_dir)
+        # process_list = self.get_process_files(root_dir)
+        process_list = self.searchCache.query_fileList_fromDb(root_dir)
         file_name_result = {}
         file_content_result = {}
-        if only_file_name:
-            file_name_result = self.find_files_byname(process_list, kword)
-        else:
-            # file_result = self.find_files_content(process_list, kword)
-            file_result = self.find_files_content_quick(process_list, kword)
-            file_name_result = file_result[0]
-            file_content_result = file_result[1]
+        if len(process_list) > 0:
+            if only_file_name:
+                file_name_result = self.find_files_byname(process_list, kword)
+            else:
+                # file_result = self.find_files_content(process_list, kword)
+                file_result = self.find_files_content_quick(process_list, kword)
+                file_name_result = file_result[0]
+                file_content_result = file_result[1]
 
         end_time = datetime.datetime.now()
         # 搜素耗时

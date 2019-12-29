@@ -7,18 +7,23 @@ import searchTool
 pprint.pprint(sys.path)  # 打印摸快搜索路径
 # pprint.pprint(os.environ)  # 打印系统环境变量
 # pprint.pprint(searchTool.find_files("E:\\java\\ideaWorkspace\\pythonTest\\tmp","简书"))
-dect = {}
-dect1 = {"a":1,"b":2,"c":3}
-dect2 = {"d":4,"e":5,"f":6}
-dect3 = {"g":7,"h":8,"i":9}
-dect1.update(dect2)
-dect1.update(dect3)
-print(dect1);
-dect_keys = dect1.keys()
-for key in dect_keys:
-    print("%s=%s"%(key,dect1.get(key)))
-a = ""
-b = "1"
-a.join(b)
-print("a=%s"%a)
-print(30*50)
+# dect = {}
+# dect1 = {"a":1,"b":2,"c":3}
+# dect2 = {"d":4,"e":5,"f":6}
+# dect3 = {"g":7,"h":8,"i":9}
+# dect1.update(dect2)
+# dect1.update(dect3)
+# print(dect1);
+# dect_keys = dect1.keys()
+# for key in dect_keys:
+#     print("%s=%s"%(key,dect1.get(key)))
+# a = ""
+# b = "1"
+# a.join(b)
+# print("a=%s"%a)
+# print(30*50)
+
+print(os.stat("E:/java/ideaWorkspace/pythonTest/tmp/444.doc").st_atime)
+os.
+
+

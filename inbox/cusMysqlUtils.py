@@ -8,12 +8,20 @@ class MysqlUtils():
 
     def __init__(self):
         # 打开数据库连接
-        self.db = pymysql.connect("127.0.0.1", "jones", "jones", "test")
+        self.__db = pymysql.connect("127.0.0.1", "jones", "jones", "test")
+
+    @property
+    def db(self):
+        return self.__db
+
+    @db.setter
+    def db(self, db):
+        self.__db = db
 
     def cus_escape_string(self, sql_param):
         return pymysql(sql_param)
 
-    def insert(self, perfix_sql="",**sql_parma):
+    def insert(self, perfix_sql="", **sql_parma):
         # 使用 cursor() 方法创建一个游标对象 cursor
         cursor = self.db.cursor()
         try:

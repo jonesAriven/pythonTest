@@ -11,6 +11,8 @@ from win32com import client as wc
 import shutil
 import time
 import shutil
+import pymysql
+import cusMysqlUtils
 
 
 class SearchCache(object):
@@ -26,7 +28,6 @@ class SearchCache(object):
         Constructor
         '''
         self.lock = threading.Lock()
-        start_time = datetime.datetime.now()
         self.cachePath = "E:/pySearchCache"
         self.cacheFile = "E:/pySearchCache/st_mtime_cache_file"
         if not os.path.exists(self.cachePath):
@@ -36,7 +37,6 @@ class SearchCache(object):
         data_dict = {}
         # 读取缓存文件
         # file格式为  原路径文件名:[文件时间戳,缓存文件路径],原路径文件名:[文件时间戳,缓存文件路径],原路径文件名:[文件时间戳,缓存文件路径],
-
         with open(self.cacheFile, "r", encoding="utf-8") as f:
             data = f.read();
             data_list = data.split(",")
@@ -46,8 +46,6 @@ class SearchCache(object):
                         # print(data_map.split("==>"))
                         data_dict.update({data_map.split("==>")[0]: data_map.split("==>")[1]})
         self.cachemap = data_dict
-        end_time = datetime.datetime.now()
-        # print("(end_time - start_time).seconds=", (end_time - start_time).seconds)
 
     def get_pyCache(self, filename):
         self.lock.acquire()
@@ -104,7 +102,6 @@ class SearchCache(object):
             pass
         finally:
             self.lock.release()
-
 
     # 这份方法为word转docx的标准方法，一步都不不能錯
     def change_doc_to_docx(self, filename):
@@ -219,9 +216,206 @@ class SearchCache(object):
         finally:
             pass
 
-    #             self.lock.release()
+    # 将指定路径的下的所有文件全路径读入数据库
+    def flushFilePathintoDb(self, root_dir):
+        """process all files in directory"""
+        process_list = []
+        try:
+            cur_dir = os.path.abspath(root_dir)
+            file_list = os.listdir(cur_dir)
 
-    # 对象销毁调用方法,将map序列化到缓存文件中  
+            for file in file_list:
+                fullfile = cur_dir + "\\" + file
+                if os.path.isfile(fullfile):
+                    process_list.append(fullfile)
+                    if len(process_list) > 10000:
+                        self.createCacheDb(process_list)
+                        process_list = []
+                elif os.path.isdir(fullfile):
+                    dir_extra_list = self.get_process_files(fullfile)
+                    if len(dir_extra_list) != 0:
+                        for x in dir_extra_list:
+                            process_list.append(x)
+                            if len(process_list) > 10000:
+                                self.createCacheDb(process_list)
+                                process_list = []
+        except:
+            pass
+        return process_list
+
+    # 写入数据库
+    def createCacheDb(self, process_list):
+        db = cusMysqlUtils.MysqlUtils().db
+        cursor = db.cursor()
+        try:
+            for each in process_list:
+                try:
+                    if os.path.splitext(each)[1] != ".tmp" and each.find("~$") == -1:
+                        cursor.execute(
+                            "insert into t_window_explore_file(full_fileName,current_st_mtime,updateTime) values (%s,%s,%s)",
+                            (pymysql.escape_string(each.replace("\\", "/")), os.stat(each).st_mtime,
+                             datetime.datetime.now().strftime("%Y%m%d%H%M%S")))
+                        # 提交到数据库执行
+                        db.commit()
+                except:
+                    # 如果发生错误则回滚
+                    db.rollback()
+        except:
+            pass
+        finally:
+            cursor.close()
+            db.close()
+
+    # updateCacheDb
+    '''
+        operate_type = args[0] # Moved Created Deleted Modified ,这里的moved指的是重命名，而不是移动
+        file_type = args[1] # file directory
+        src_name = args[2] # file or directory name
+        des_src_name = ""
+        if len(args) > 3:
+            des_src_name = args[3] # 只有moved的情况下才存在该参数
+        if operate_type == "Moved":
+            # 重命名的情况下，文件的时间戳不会变化，所以可以根据时间戳更新数据库
+    '''
+
+    # 通过操作mysql 存过程，更新缓存
+    def updateCacheDbByProc(self, *args):
+        operate_type = args[0]  # Moved Created Deleted Modified ,这里的moved指的是重命名，而不是移动
+        file_type = args[1]  # file directory
+        src_name = args[2]  # file or directory name
+        current_st_mtime = ""
+        des_src_name = ""
+        if len(args) > 3:
+            des_src_name = args[3]  # 只有moved的情况下才存在该参数
+            current_st_mtime = os.stat(des_src_name).st_atime
+        else:
+            current_st_mtime = os.stat(src_name).st_atime
+        db = cusMysqlUtils.MysqlUtils().db
+        cusor = db.cursor()
+        try:
+            cusor.callproc("p_window_explore_log", (operate_type, file_type, src_name, des_src_name, current_st_mtime))
+        except:
+            db.rollback()
+            traceback.print_exc()
+        finally:
+            cusor.close()
+            db.close()
+
+    # 直接通过sql语句操作数据库，更新缓存
+    def updateCacheDb(self, *args):
+        operate_type = args[0]  # Moved Created Deleted Modified ,这里的moved指的是重命名，而不是移动
+        file_type = args[1]  # file directory
+        src_name = args[2]  # file or directory name
+        des_src_name = ""
+        if len(args) > 3:
+            des_src_name = args[3]  # 只有moved的情况下才存在该参数
+        db = cusMysqlUtils.MysqlUtils().db
+        cursor = db.cursor()
+        try:
+            if file_type == "file":
+                if len(args) == 4:
+                    if operate_type == "Moved":
+                        cursor.execute(
+                            "update t_window_explore_file set full_fileName = %s,updateTime = %s where current_st_mtime = %s",
+                            ([pymysql.escape_string(des_src_name), datetime.datetime.now().strftime("%Y%m%d%H%M%S"),
+                              os.stat(des_src_name).st_atime]))
+                elif len(args) == 3:
+                    if operate_type == "Created":
+                        cursor.execute(
+                            "insert into t_window_explore_file(full_fileName,current_st_mtime,updateTime) values (%s,%s,%s)",
+                            ([pymysql.escape_string(src_name), os.stat(src_name).st_atime,
+                              datetime.datetime.now().strftime("%Y%m%d%H%M%S")]))
+                    elif operate_type == "Deleted":
+                        cursor.execute("delete from t_window_explore_file where full_fileName = %s",
+                                       pymysql.escape_string(src_name))
+                    elif operate_type == "Modified":
+                        cursor.execute(
+                            "update t_window_explore_file set current_st_mtime = %s, updateTime = %s where full_fileName = %s",
+                            ([os.stat(src_name).st_atime, datetime.datetime.now().strftime("%Y%m%d%H%M%S"),
+                              pymysql.escape_string(src_name)]))
+            db.commit()
+        except:
+            db.rollback()
+            traceback.print_exc()
+            pass
+        finally:
+            cursor.close()
+            db.close()
+
+    '''
+        operate_type = args[0] # Moved Created Deleted Modified ,这里的moved指的是重命名，而不是移动
+        file_type = args[1] # file directory
+        src_name = args[2] # file or directory name
+        des_src_name = ""
+        if len(args) > 3:
+            des_src_name = args[3] # 只有moved的情况下才存在该参数
+    '''
+
+    def update_chche_1(self, *args):
+        # self.updateCacheDb(*args)
+        self.updateCacheDbByProc(*args)
+
+    # 从数据库查询缓存map
+    def get_pyCache_FromDb(self, filename):
+        db = cusMysqlUtils.MysqlUtils().db
+        cursor = db.cursor()
+        result = ""
+        try:
+            cursor.execute("select st_mtime,doc_cache_path from t_window_doc_cache_map where file_path = %s",
+                           pymysql.escape_string(filename))
+            sqlReuslt = cursor.fetchone()
+            if sqlReuslt:
+                result = sqlReuslt[0] + "@" + sqlReuslt[1]
+        except:
+            traceback.print_exc()
+            pass
+        finally:
+            cursor.close()
+            db.close()
+        return result
+
+    def update_docCache_Db(self, filename, st_mtime, docx_filename):
+        db = cusMysqlUtils.MysqlUtils().db
+        cursor = db.cursor()
+        try:
+            if self.get_pyCache_FromDb(filename):
+                cursor.execute("update t_window_doc_cache_map set st_mtime = %s,updateTime = %s where file_path = %s", (
+                    [st_mtime, datetime.datetime.now().strftime("%Y%m%d%H%M%S"), pymysql.escape_string(filename)]))
+            else:
+                cursor.execute(
+                    "insert into t_window_doc_cache_map (updateTime,file_path,doc_cache_path,st_mtime) values (%s,%s,%s,%s)",
+                    (
+                        [datetime.datetime.now().strftime("%Y%m%d%H%M%S"), pymysql.escape_string(filename),
+                         pymysql.escape_string(docx_filename), st_mtime]))
+            db.commit()
+        except:
+            db.rollback()
+            traceback.print_exc()
+            pass
+        finally:
+            cursor.close()
+            db.close()
+
+    def query_fileList_fromDb(self, root_dir):
+        db = cusMysqlUtils.MysqlUtils().db
+        cursor = db.cursor()
+        file_List = []
+        try:
+            cursor.execute( "select full_fileName from t_window_explore_file where full_fileName like %s",("%" + pymysql.escape_string(root_dir) + "%"))
+            result = cursor.fetchall()
+            for each in result:
+                file_List.append(each[0])
+            print(file_List)
+        except:
+            db.rollback()
+            traceback.print_exc()
+            pass
+        finally:
+            cursor.close()
+            db.close()
+        return file_List
+
+    # 对象销毁调用方法,将map序列化到缓存文件中
     def __del__(self):
         try:
             tmp_map = self.get_cachemap()
