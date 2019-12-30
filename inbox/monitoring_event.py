@@ -17,7 +17,7 @@ class MyLoggingEventHandler(FileSystemEventHandler):
         dest_path =  event.dest_path.replace("\\","/")
         logging.info("Moved %s: from %s to %s", what, src_path,
                      dest_path)
-        if src_path.find("~$") == -1 and src_path.find(".tmp") == -1 and dest_path.find("~$") == -1 and dest_path.find(".tmp") == -1:
+        if src_path.find("~$") == -1 and src_path.find(".tmp") == -1 and dest_path.find("~$") == -1 and dest_path.find(".tmp") == -1 and  src_path.find(".TMP") == -1 :
             self.searchCache.update_chche_1("Moved",what,src_path, dest_path)
 
     def on_created(self, event):

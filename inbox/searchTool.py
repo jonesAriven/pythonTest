@@ -117,9 +117,13 @@ class search():
         current_st_mtime = os.stat(filename).st_mtime
         # 获取最近一次查询的文件的时间错
         # print(self.searchCache.get_cachemap())
-        # pyCache = self.searchCache.get_pyCache(filename)
-        # 将缓存map由从文件里获取改为实时从数据库里读取
-        pyCache = self.searchCache.get_pyCache_FromDb(filename)
+
+        pyCache = ""
+        if self.searchCache.chcheType == "DB":
+            # 将缓存map由从文件里获取改为实时从数据库里读取
+            pyCache = self.searchCache.get_pyCache_FromDb(filename)
+        else:
+            pyCache = self.searchCache.get_pyCache(filename)
         # print(pyCache)
         recently_st_mtime = ""
         recently_cach_file_path = ""
@@ -140,9 +144,12 @@ class search():
 
     # 向缓存文件里写入信息
     def update_cache_map(self, filename, docx_filename):
-        # self.searchCache.get_cachemap().update({filename: str(os.stat(filename).st_mtime) + "@" + docx_filename})
-        # 之前的map是写到文件，所以全量更新，现在写到数据库，只需增量更新
-        self.searchCache.update_docCache_Db(filename, str(os.stat(filename).st_mtime), docx_filename);
+
+        if self.searchCache.chcheType == "DB":
+            # 之前的map是写到文件，所以全量更新，现在写到数据库，只需增量更新
+            self.searchCache.update_docCache_Db(filename, str(os.stat(filename).st_mtime), docx_filename);
+        else:
+            self.searchCache.get_cachemap().update({filename: str(os.stat(filename).st_mtime) + "@" + docx_filename})
 
     def search_doc_1(self, filename, word):
         cache_docx_full_name = self.searchCache.change_doc_to_docx(filename)
@@ -429,9 +436,13 @@ class search():
     def find_files(self, root_dir, kword, output_path, only_file_name=False):
         start_time = datetime.datetime.now()
         pprint.pprint("开始搜素，请耐心等待..............")
+        process_list = ""
         # 查找传入目录下的所有文件
         # process_list = self.get_process_files(root_dir)
-        process_list = self.searchCache.query_fileList_fromDb(root_dir)
+        if self.searchCache.chcheType == "DB":
+            process_list = self.searchCache.query_fileList_fromDb(root_dir)
+        else:
+            process_list = self.get_process_files(root_dir)
         file_name_result = {}
         file_content_result = {}
         if len(process_list) > 0:

@@ -30,6 +30,8 @@ class SearchCache(object):
         self.lock = threading.Lock()
         self.cachePath = "E:/pySearchCache"
         self.cacheFile = "E:/pySearchCache/st_mtime_cache_file"
+        # 缓存类型，是缓存到db还是缓存到文件,DB：缓存到DB，FILE:缓存到文件
+        self._chcheType = "DB"
         if not os.path.exists(self.cachePath):
             os.makedirs(self.cachePath)
         if not os.path.exists(self.cacheFile):
@@ -46,6 +48,14 @@ class SearchCache(object):
                         # print(data_map.split("==>"))
                         data_dict.update({data_map.split("==>")[0]: data_map.split("==>")[1]})
         self.cachemap = data_dict
+
+    @property
+    def chcheType(self):
+        return self._chcheType
+
+    @chcheType.name
+    def chcheType(self, chcheType):
+        self._chcheType = chcheType
 
     def get_pyCache(self, filename):
         self.lock.acquire()
@@ -119,12 +129,16 @@ class SearchCache(object):
             # 为避免在原文件已经打开的情况下操作它， 将原文件复制一份出来，放到缓存目录下
             shutil.copy(filename, self.cachePath)
             # 打开缓存路径下的doc文件
-            doc = wordApplication.Documents.Open(cache_doc_full_name)
+            if cache_doc_full_name.find(" ") != -1: # 如果文件路径中保护空格， wordApplication.Documents.Open将无法处理，这里处理一下空格
+                shutil.move(cache_doc_full_name,cache_doc_full_name.replace(" ","_"))
+                doc = wordApplication.Documents.Open(cache_doc_full_name)
             # 将缓存路径的doc文件转为docx文件,缓存路径下的docx全路径名
             docx_filename = filename.replace(":", "_").replace("/", "_").replace("\\", "_").replace(".doc", ".docx")
             cache_docx_full_name = self.cachePath + "/" + docx_filename
             if os.path.exists(cache_docx_full_name):
                 os.remove(cache_docx_full_name)
+            if cache_doc_full_name.find(" ") != -1:
+                cache_docx_full_name = cache_docx_full_name.replace(" ","_")
             # save时不能创建目录，所以此处得保证docx_filename 的文件名正确，不能出现让程序生成目录，否则会跑异常
             doc.SaveAs(cache_docx_full_name, 12, False, "", True, "", False, False, False, False)  # 转化后路径下的文件
             # 转换成功后将缓存路径下的doc文件删除
@@ -287,13 +301,17 @@ class SearchCache(object):
         des_src_name = ""
         if len(args) > 3:
             des_src_name = args[3]  # 只有moved的情况下才存在该参数
-            current_st_mtime = os.stat(des_src_name).st_atime
+            if os.path.isfile(des_src_name) or os.path.isdir(des_src_name):
+                current_st_mtime = os.stat(des_src_name).st_atime
         else:
-            current_st_mtime = os.stat(src_name).st_atime
+            if os.path.isfile(des_src_name) or os.path.isdir(des_src_name):
+                current_st_mtime = os.stat(src_name).st_atime
+
         db = cusMysqlUtils.MysqlUtils().db
         cusor = db.cursor()
         try:
             cusor.callproc("p_window_explore_log", (operate_type, file_type, src_name, des_src_name, current_st_mtime))
+            print(1111)
         except:
             db.rollback()
             traceback.print_exc()
@@ -401,7 +419,8 @@ class SearchCache(object):
         cursor = db.cursor()
         file_List = []
         try:
-            cursor.execute( "select full_fileName from t_window_explore_file where full_fileName like %s",("%" + pymysql.escape_string(root_dir) + "%"))
+            cursor.execute("select full_fileName from t_window_explore_file where full_fileName like %s",
+                           ("%" + pymysql.escape_string(root_dir) + "%"))
             result = cursor.fetchall()
             for each in result:
                 file_List.append(each[0])
