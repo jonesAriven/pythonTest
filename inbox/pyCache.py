@@ -53,7 +53,7 @@ class SearchCache(object):
     def chcheType(self):
         return self._chcheType
 
-    @chcheType.name
+    @chcheType.setter
     def chcheType(self, chcheType):
         self._chcheType = chcheType
 
@@ -246,7 +246,7 @@ class SearchCache(object):
                         self.createCacheDb(process_list)
                         process_list = []
                 elif os.path.isdir(fullfile):
-                    dir_extra_list = self.get_process_files(fullfile)
+                    dir_extra_list = self.flushFilePathintoDb(fullfile)
                     if len(dir_extra_list) != 0:
                         for x in dir_extra_list:
                             process_list.append(x)
@@ -444,5 +444,5 @@ class SearchCache(object):
                     f.writelines(str(each) + "==>" + str(tmp_map.get(each)) + ",")
                 f.close()
         except:
-            traceback.print_exc()
+            # traceback.print_exc()
             pass

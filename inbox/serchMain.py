@@ -8,23 +8,22 @@ from watchdog.events import FileSystemEventHandler
 from pyCache import SearchCache
 import traceback
 
-logging.basicConfig(level=logging.INFO,
-                    format='%(asctime)s - %(message)s',
-                    datefmt='%Y-%m-%d %H:%M:%S')
+# logging.basicConfig(level=logging.INFO,
+#                     format='%(asctime)s - %(message)s',
+#                     datefmt='%Y-%m-%d %H:%M:%S')
 # path = sys.argv[1] if len(sys.argv) > 1 else '.'
-path = "E:/java/ideaWorkspace/pythonTest/tmp"
-event_handler = monitoring_event.MyLoggingEventHandler()
-observer = Observer()
-observer.schedule(event_handler, path, recursive=True)
-observer.start()
-try:
-    while True:
-        time.sleep(1)
-except KeyboardInterrupt:
-    observer.stop()
-    traceback.print_exc()
-observer.join()
+# event_handler = monitoring_event.MyLoggingEventHandler()
+# observer = Observer()
+# observer.schedule(event_handler, path, recursive=True)
+# observer.start()
+# try:
+#     while True:
+#         time.sleep(1)
+# except KeyboardInterrupt:
+#     observer.stop()
+#     traceback.print_exc()
+# observer.join()
 
 
 
-# pyCache.SearchCache().flushFilePathintoDb("F:/")
+pyCache.SearchCache().flushFilePathintoDb("E:/")
